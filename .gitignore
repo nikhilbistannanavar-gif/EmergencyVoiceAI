@@ -1,0 +1,16 @@
+# ESP-IDF build files
+build/
+build.log
+
+# SDK config backups
+sdkconfig.old
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
