@@ -1,16 +1,41 @@
+<<<<<<< HEAD
 # ESP-IDF build files
 build/
 build.log
 
 # SDK config backups
 sdkconfig.old
+=======
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+>>>>>>> fb364f7193796b95578df45692bc57b8ac0d53ff
 
 # macOS
 .DS_Store
 
+<<<<<<< HEAD
 # VS Code
 .vscode/
 
 # Python
 __pycache__/
 *.pyc
+=======
+# TensorFlow
+checkpoints/
+logs/
+
+# Datasets
+dataset/
+processed/
+
+# VS Code
+.vscode/
+>>>>>>> fb364f7193796b95578df45692bc57b8ac0d53ff
