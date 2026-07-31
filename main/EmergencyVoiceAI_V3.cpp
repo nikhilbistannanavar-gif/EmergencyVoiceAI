@@ -210,6 +210,26 @@ if (frames_collected < 49)
     // Get pointer to spectrogram
     const float *mel = frontend_get_mel();
 
+    float mn = mel[0];
+float mx = mel[0];
+
+for (int i = 0; i < 49 * 64; i++)
+{
+    if (mel[i] < mn) mn = mel[i];
+    if (mel[i] > mx) mx = mel[i];
+}
+
+printf("Mel range: %f  %f\n", mn, mx);
+
+printf("First 20 mel values:\n");
+
+for (int i = 0; i < 20; i++)
+{
+    printf("%.3f ", mel[i]);
+}
+
+printf("\n");
+
     // Copy 49x64 = 3136 values into input tensor
     for (int i = 0; i < 49 * 64; i++)
 {

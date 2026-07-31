@@ -2,18 +2,22 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+
 #include "dsps_fft2r.h"
 #include "dsps_wind_hann.h"
-#include <math.h>
+
 #include "mel_filterbank.h"
 
 static int16_t frame_buffer[FRAME_LENGTH];
 static int16_t overlap_buffer[FRAME_STEP];
 
 static float fft_buffer[FFT_LENGTH * 2];
-static float magnitude[FFT_LENGTH / 2 + 1];
+static float magnitude[FFT_BINS];
+
 static float current_mel[MEL_BINS];
-static float mel_spectrogram[49][MEL_BINS];
+static float mel_spectrogram[TOTAL_FRAMES][MEL_BINS];
+
 static float window[FRAME_LENGTH];
 
 void frontend_init(void)
@@ -29,24 +33,25 @@ void frontend_init(void)
 
     printf("Frontend initialized\n");
 }
+
 void frontend_process(const int16_t *pcm)
 {
-    // Previous 320 samples
+    /* Build 640-sample frame */
+
     memcpy(frame_buffer,
            overlap_buffer,
            FRAME_STEP * sizeof(int16_t));
 
-    // New 320 samples
     memcpy(frame_buffer + FRAME_STEP,
            pcm,
            FRAME_STEP * sizeof(int16_t));
 
-    // Save overlap
     memcpy(overlap_buffer,
            frame_buffer + FRAME_STEP,
            FRAME_STEP * sizeof(int16_t));
 
-    // Windowing
+    /* Window */
+
     for (int i = 0; i < FRAME_LENGTH; i++)
     {
         fft_buffer[2 * i] =
@@ -55,18 +60,23 @@ void frontend_process(const int16_t *pcm)
         fft_buffer[2 * i + 1] = 0.0f;
     }
 
-    // Zero padding
+    /* Zero padding */
+
     for (int i = FRAME_LENGTH; i < FFT_LENGTH; i++)
     {
         fft_buffer[2 * i] = 0.0f;
         fft_buffer[2 * i + 1] = 0.0f;
     }
 
+    /* FFT */
+
     dsps_fft2r_fc32(fft_buffer, FFT_LENGTH);
     dsps_bit_rev_fc32(fft_buffer, FFT_LENGTH);
     dsps_cplx2reC_fc32(fft_buffer, FFT_LENGTH);
 
-    for (int i = 0; i <= FFT_LENGTH / 2; i++)
+    /* Magnitude */
+
+    for (int i = 0; i < FFT_BINS; i++)
     {
         float real = fft_buffer[2 * i];
         float imag = fft_buffer[2 * i + 1];
@@ -74,29 +84,48 @@ void frontend_process(const int16_t *pcm)
         magnitude[i] = sqrtf(real * real + imag * imag);
     }
 
+    /* TensorFlow-compatible Log-Mel */
+
     mel_filterbank_compute(magnitude, current_mel);
 
-    // Shift spectrogram
-    for (int i = 0; i < 48; i++)
+    /* Rolling 49-frame spectrogram */
+
+    for (int i = 0; i < TOTAL_FRAMES - 1; i++)
     {
         memcpy(mel_spectrogram[i],
                mel_spectrogram[i + 1],
                sizeof(float) * MEL_BINS);
     }
 
-    memcpy(mel_spectrogram[48],
+    memcpy(mel_spectrogram[TOTAL_FRAMES - 1],
            current_mel,
            sizeof(float) * MEL_BINS);
 
-    printf("Mel: ");
+    /* -------- DEBUG: Print complete 49x64 feature -------- */
 
-    for (int i = 0; i < 10; i++)
+    static int feature_printed = 0;
+    static int frame_count = 0;
+
+    frame_count++;
+
+    if (!feature_printed && frame_count >= TOTAL_FRAMES)
     {
-        printf("%.3f ", current_mel[i]);
-    }
+        feature_printed = 1;
 
-    printf("\n");
-}
+        printf("\nBEGIN_FEATURE\n");
+
+        const float *mel = frontend_get_mel();
+
+        for (int i = 0; i < TOTAL_FRAMES * MEL_BINS; i++)
+        {
+            printf("%.6f\n", mel[i]);
+        }
+
+        printf("END_FEATURE\n");
+    }
+}   // <-- frontend_process() ENDS HERE
+
+
 const float *frontend_get_mel(void)
 {
     return &mel_spectrogram[0][0];
